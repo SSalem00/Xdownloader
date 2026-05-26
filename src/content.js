@@ -14,19 +14,19 @@ function getTweetId(article) {
   return match ? match[1] : null;
 }
 
-// Twitter renders GIFs as looping <video> tags, same as regular videos.
+// tweetPhoto covers images + video; others are fallbacks.
 function hasMedia(article) {
   return (
+    article.querySelector('[data-testid="tweetPhoto"]') !== null ||
     article.querySelector("video") !== null ||
-    article.querySelector('[data-testid="videoComponent"]') !== null ||
-    article.querySelector('[data-testid="tweetPhoto"] video') !== null
+    article.querySelector('[data-testid="videoComponent"]') !== null
   );
 }
 
 function createDownloadButton(tweetId) {
   const btn = document.createElement("button");
   btn.className = "twitterdl-btn";
-  btn.title = "Download video / GIF";
+  btn.title = "Download media";
   btn.setAttribute("aria-label", "Download media");
   btn.innerHTML = `
     <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
@@ -62,18 +62,26 @@ async function handleDownload(tweetId, btn) {
   btn.classList.add("twitterdl-loading");
 
   try {
-    const info = await fetchMediaInfo(tweetId);
-    if (!info?.url) {
+    const response = await fetchMediaInfo(tweetId);
+    const items = response?.items ?? [];
+    if (items.length === 0) {
       showToast("❌ Could not find downloadable media.");
       return;
     }
 
-    const filename = `tweet_${tweetId}`;
-    if (info.type === "animated_gif") {
-      showToast("⏳ Converting to GIF…");
-      await convertAndDownloadGif(info.url, filename);
-    } else {
-      triggerDownload(info.url, filename);
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const suffix = items.length > 1 ? `_${i + 1}` : "";
+      const filename = `tweet_${tweetId}${suffix}`;
+
+      if (item.type === "animated_gif") {
+        showToast("⏳ Converting to GIF…");
+        await convertAndDownloadGif(item.url, filename);
+      } else if (item.type === "video") {
+        triggerDownload(item.url, filename, "mp4");
+      } else if (item.type === "photo") {
+        triggerDownload(item.url, filename, item.ext);
+      }
     }
 
     btn.classList.add("twitterdl-done");
@@ -90,8 +98,8 @@ function fetchMediaInfo(tweetId) {
   return sendMessage({ type: "FETCH_MEDIA_URL", tweetId });
 }
 
-function triggerDownload(url, filename) {
-  chrome.runtime.sendMessage({ type: "DOWNLOAD_FILE", url, filename });
+function triggerDownload(url, filename, ext) {
+  chrome.runtime.sendMessage({ type: "DOWNLOAD_FILE", url, filename, ext });
 }
 
 function convertAndDownloadGif(url, filename) {

@@ -31,7 +31,7 @@ function fetchMediaInfo(tweetId) {
 
     const json = await res.json();
     dlog("mediaDetails", json?.mediaDetails);
-    return extractBestMedia(json);
+    return extractAllMedia(json);
   })();
 
   mediaInfoCache.set(tweetId, promise);
@@ -40,9 +40,8 @@ function fetchMediaInfo(tweetId) {
   return promise;
 }
 
-// Returns {url, type} or null if no video/gif. Throws if the response shape
-// doesn't match what we expect (canary for API changes).
-function extractBestMedia(json) {
+// Returns {type, url, ext?} items. Throws if the response shape is unexpected.
+function extractAllMedia(json) {
   if (!json || typeof json !== "object") {
     throw new Error("Syndication response not JSON-shaped");
   }
@@ -50,24 +49,27 @@ function extractBestMedia(json) {
     throw new Error("mediaDetails missing or not an array");
   }
 
+  const items = [];
   for (const media of json.mediaDetails) {
-    if (media.type !== "video" && media.type !== "animated_gif") continue;
-
-    const variants =
-      media.video_info?.variants?.filter(
-        (v) => v.content_type === "video/mp4"
-      ) ?? [];
-
-    if (variants.length === 0) continue;
-
-    variants.sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0));
-    const picked = variants[0];
-    dlog("picked variant", { type: media.type, bitrate: picked.bitrate, url: picked.url });
-    return { url: picked.url, type: media.type };
+    if (media.type === "video" || media.type === "animated_gif") {
+      const variants =
+        media.video_info?.variants?.filter(
+          (v) => v.content_type === "video/mp4"
+        ) ?? [];
+      if (variants.length === 0) continue;
+      variants.sort((a, b) => (b.bitrate ?? 0) - (a.bitrate ?? 0));
+      items.push({ type: media.type, url: variants[0].url });
+    } else if (media.type === "photo") {
+      const baseUrl = media.media_url_https;
+      if (!baseUrl) continue;
+      const extMatch = baseUrl.match(/\.([a-z0-9]+)$/i);
+      const ext = extMatch ? extMatch[1].toLowerCase() : "jpg";
+      items.push({ type: "photo", url: `${baseUrl}?name=orig`, ext });
+    }
   }
 
-  dlog("no video/animated_gif media found in tweet");
-  return null;
+  dlog("extracted media", items);
+  return items;
 }
 
 const OFFSCREEN_PATH = "src/offscreen.html";
@@ -108,7 +110,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   dlog("message received", message?.type);
   if (message.type === "FETCH_MEDIA_URL") {
     fetchMediaInfo(message.tweetId)
-      .then((info) => sendResponse(info ? info : { url: null }))
+      .then((items) => sendResponse({ items: items ?? [] }))
       .catch((err) => sendResponse({ error: err.message }));
     return true;
   }
@@ -117,7 +119,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     chrome.downloads
       .download({
         url: message.url,
-        filename: `${message.filename}.mp4`,
+        filename: `${message.filename}.${message.ext || "mp4"}`,
         saveAs: false,
       })
       .then((id) => sendResponse({ id }))

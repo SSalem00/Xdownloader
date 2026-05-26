@@ -9,7 +9,8 @@
     "https://x.com/*",
     "https://api.twitter.com/*",
     "https://cdn.syndication.twimg.com/*",
-    "https://video.twimg.com/*"
+    "https://video.twimg.com/*",
+    "https://pbs.twimg.com/*"
   ],
   "content_scripts": [{
     "matches": ["https://twitter.com/*", "https://x.com/*"],
