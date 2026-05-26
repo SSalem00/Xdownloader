@@ -93,7 +93,7 @@ async function handleDownload(tweetId, btn) {
     setTimeout(() => btn.classList.remove("twitterdl-done"), 2000);
   } catch (err) {
     console.error("[Xdownloader]", err);
-    showToast("❌ Download failed. See console for details.");
+    showToast(`❌ ${err?.message ?? "Download failed"}`);
   } finally {
     btn.classList.remove("twitterdl-loading");
   }
