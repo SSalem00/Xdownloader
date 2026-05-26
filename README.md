@@ -1,10 +1,10 @@
 # Xdownloader
 
-A small Chrome/Brave extension that adds a download button to tweets with video or GIFs.
+A Chromium based extension that adds a download button to tweets with video or GIFs.
 
 The one thing it does that most don't: Twitter "GIFs" are actually MP4s, and most downloaders just give you that MP4. This one re-encodes them into a real `.gif` file so what you save is what you'd expect.
 
-No third-party sites, no login, no tracking.
+No third-party sites needed.
 
 ## Install
 
@@ -14,7 +14,7 @@ No third-party sites, no login, no tracking.
    ```
    Keep the folder somewhere permanent. The browser loads files from it directly.
 
-2. Go to `chrome://extensions` (or `brave://extensions`).
+2. Go to `chrome://extensions` 
 3. Turn on **Developer mode** (top right).
 4. Click **Load unpacked** and pick the folder you just downloaded (the one with `manifest.json`).
 
